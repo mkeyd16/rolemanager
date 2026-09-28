@@ -158,6 +158,7 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         target.timeout.assert_called_once_with(datetime.timedelta(seconds=600), reason="[MINOR] Minor Offense")
         sent_msg = self.interaction.followup.send.call_args[0][0]
         self.assertIn("10-minute timeout has been applied", sent_msg)
+        self.assertEqual(self.interaction.followup.send.call_args[1].get("ephemeral"), False)
 
         # 3. Moderator attempting major -> rejected
         self.interaction.user = mod

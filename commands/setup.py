@@ -133,17 +133,9 @@ class Setup(commands.Cog):
             f"Join/leave notifications channel successfully set to {channel.mention}.", ephemeral=True
         )
 
-    # Alias for join_leave with underscore if needed
-    @setup_group.command(name="join_leave", description="Set the channel for join and leave notifications")
-    @app_commands.describe(channel="The channel where join/leave messages will be posted")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def setup_join_leave_underscore(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        await self.setup_join_leave.callback(self, interaction, channel)
-
     @setup_moderation_roles.error
     @setup_moderation_logs.error
     @setup_join_leave.error
-    @setup_join_leave_underscore.error
     async def setup_error_handler(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingPermissions):
             msg = "You do not have Administrator permissions to run this setup command."

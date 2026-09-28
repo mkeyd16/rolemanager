@@ -83,6 +83,7 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         member.guild = guild
         member.name = "JohnDoe"
         member.display_name = "Johnny"
+        member.mention = "<@555>"
         member.created_at = created_at
         member.joined_at = joined_at
 
@@ -93,22 +94,26 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         db_ts = self.db.get_user_join_timestamp(self.guild_id, 555)
         self.assertIsNotNone(db_ts)
 
-        # Ensure join message sent to channel
+        # Ensure join message embed sent to channel
         channel.send.assert_called_once()
-        join_text = channel.send.call_args[0][0]
-        self.assertIn("**User has joined the server.**", join_text)
-        self.assertIn("@JohnDoe (Johnny)", join_text)
-        self.assertIn("Account age: 100 days", join_text)
+        kwargs = channel.send.call_args[1]
+        self.assertIn("embed", kwargs)
+        join_embed = kwargs["embed"]
+        self.assertEqual(join_embed.title, "User has joined the server.")
+        self.assertIn("<@555> (Johnny)", join_embed.description)
+        self.assertIn("Account age: 100 days", join_embed.description)
 
         # Test on_member_remove with recorded join timestamp
         channel.send.reset_mock()
         await self.member_cog.on_member_remove(member)
 
         channel.send.assert_called_once()
-        leave_text = channel.send.call_args[0][0]
-        self.assertIn("**User has left the server.**", leave_text)
-        self.assertIn("@JohnDoe (Johnny)", leave_text)
-        self.assertIn("Time in server: 10 days", leave_text)
+        kwargs = channel.send.call_args[1]
+        self.assertIn("embed", kwargs)
+        leave_embed = kwargs["embed"]
+        self.assertEqual(leave_embed.title, "User has left the server.")
+        self.assertIn("<@555> (Johnny)", leave_embed.description)
+        self.assertIn("Time in server: 10 days", leave_embed.description)
 
     async def test_member_leave_without_recorded_join_timestamp(self):
         guild = MagicMock(spec=discord.Guild)
@@ -123,14 +128,18 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         member.guild = guild
         member.name = "UnknownUser"
         member.display_name = "Unknown"
+        member.mention = "<@777>"
         member.joined_at = None
 
         await self.member_cog.on_member_remove(member)
 
         channel.send.assert_called_once()
-        leave_text = channel.send.call_args[0][0]
-        self.assertIn("Join date: Unknown", leave_text)
-        self.assertIn("Time in server: Unknown", leave_text)
+        kwargs = channel.send.call_args[1]
+        self.assertIn("embed", kwargs)
+        leave_embed = kwargs["embed"]
+        self.assertEqual(leave_embed.title, "User has left the server.")
+        self.assertIn("Join date: Unknown", leave_embed.description)
+        self.assertIn("Time in server: Unknown", leave_embed.description)
 
 
 if __name__ == "__main__":
