@@ -25,6 +25,17 @@ class MemberEvents(commands.Cog):
         db.record_user_join(guild.id, member.id, join_ts)
 
         config = db.get_guild_config(guild.id)
+
+        # Assign Unverified role if verification is configured
+        if config and config.get("unverified_role_id"):
+            unverified_role_id = config["unverified_role_id"]
+            unverified_role = guild.get_role(unverified_role_id)
+            if unverified_role and not member.bot:
+                try:
+                    await member.add_roles(unverified_role, reason="New member unverified assignment")
+                except Exception as e:
+                    logger.warning(f"Failed to assign Unverified role to {member.id} in guild {guild.id}: {e}")
+
         if not config or not config.get("join_leave_channel_id"):
             return
 

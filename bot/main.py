@@ -27,7 +27,9 @@ class MultipurposeBot(commands.Bot):
         initial_extensions = [
             "commands.setup",
             "commands.moderation",
+            "commands.verification",
             "events.member_events",
+            "events.verification_events",
         ]
 
         for ext in initial_extensions:

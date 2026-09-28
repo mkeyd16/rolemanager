@@ -32,10 +32,25 @@ class Database:
                     moderator_role_id INTEGER,
                     senior_mod_role_id INTEGER,
                     moderation_logs_channel_id INTEGER,
-                    join_leave_channel_id INTEGER
+                    join_leave_channel_id INTEGER,
+                    verification_channel_id INTEGER,
+                    verified_role_id INTEGER,
+                    unverified_role_id INTEGER,
+                    verification_message_id INTEGER
                 )
                 """
             )
+            cursor.execute("PRAGMA table_info(guild_config)")
+            columns = [column[1] for column in cursor.fetchall()]
+            new_cols = [
+                ("verification_channel_id", "INTEGER"),
+                ("verified_role_id", "INTEGER"),
+                ("unverified_role_id", "INTEGER"),
+                ("verification_message_id", "INTEGER"),
+            ]
+            for col_name, col_type in new_cols:
+                if col_name not in columns:
+                    cursor.execute(f"ALTER TABLE guild_config ADD COLUMN {col_name} {col_type}")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS user_tracking (
@@ -102,6 +117,37 @@ class Database:
                     moderation_logs_channel_id = excluded.moderation_logs_channel_id
                 """,
                 (guild_id, channel_id),
+            )
+            conn.commit()
+
+    def set_verification_config(
+        self,
+        guild_id: int,
+        verification_channel_id: int,
+        verified_role_id: int,
+        unverified_role_id: int,
+        verification_message_id: int,
+    ) -> None:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO guild_config (
+                    guild_id, verification_channel_id, verified_role_id, unverified_role_id, verification_message_id
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET
+                    verification_channel_id = excluded.verification_channel_id,
+                    verified_role_id = excluded.verified_role_id,
+                    unverified_role_id = excluded.unverified_role_id,
+                    verification_message_id = excluded.verification_message_id
+                """,
+                (
+                    guild_id,
+                    verification_channel_id,
+                    verified_role_id,
+                    unverified_role_id,
+                    verification_message_id,
+                ),
             )
             conn.commit()
 
