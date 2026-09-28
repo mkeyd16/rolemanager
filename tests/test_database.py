@@ -79,18 +79,6 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(cfg["moderation_logs_channel_id"], 9001)
         self.assertEqual(cfg["join_leave_channel_id"], 9002)
 
-    def test_latest_message_channel_tracking(self):
-        guild_id = 888
-        user_id = 42
-
-        self.assertIsNone(self.db.get_latest_message_channel(guild_id, user_id))
-
-        self.db.update_latest_message_channel(guild_id, user_id, 111)
-        self.assertEqual(self.db.get_latest_message_channel(guild_id, user_id), 111)
-
-        # Update to another channel
-        self.db.update_latest_message_channel(guild_id, user_id, 222)
-        self.assertEqual(self.db.get_latest_message_channel(guild_id, user_id), 222)
 
     def test_join_timestamp_recording_and_retrieval(self):
         guild_id = 999

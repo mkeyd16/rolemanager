@@ -28,7 +28,6 @@ class MultipurposeBot(commands.Bot):
             "commands.setup",
             "commands.moderation",
             "events.member_events",
-            "events.message_tracking",
         ]
 
         for ext in initial_extensions:

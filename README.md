@@ -8,7 +8,7 @@ A simple, production-ready, modular Discord bot written in Python using `discord
 - **SQLite Database**: Persistent per-guild configuration and tracking using parameterized queries.
 - **Role & Channel Configuration**: Persistent role and channel ID storage resilient to role/channel renames, position changes, or color edits.
 - **Staff Hierarchy**: Enforces moderation authority hierarchy (`Owner` > `Senior Mod` > `Moderator` > `Trainee`). Lower-ranked staff cannot moderate equal or higher-ranked staff.
-- **Moderation Tools**: `/warn` (targets user's last active message channel) and `/punish` with severity-restricted timeouts (`minor` 10m, `moderate` 45m, `major` 48h).
+- **Moderation Tools**: `/warn` (sends warning embed in current channel) and `/punish` with severity-restricted timeouts (`minor` 10m, `moderate` 45m, `major` 48h).
 - **Staff Management**: Owner-only `/hire`, `/promote`, and `/fire` commands.
 - **Join/Leave Logging**: Tracks member joins (with account age) and leaves (calculating time in server).
 - **Moderation Audit Logs**: Posts embeds for all moderation and staff actions in the configured moderation logs channel.
@@ -55,7 +55,7 @@ Trainee
 - `/setup join-leave [channel]`: Configures the text channel for member join and leave notifications.
 
 ### Moderation Commands
-- `/warn [user] [reason]`: Sends a warning message to the target user in the last text channel where they spoke, and logs the action in the moderation logs channel.
+- `/warn [user] [reason]`: Sends a warning embed to the target user in the current channel where the command was used, and logs the action in the moderation logs channel.
 - `/punish [user] [severity] [reason]`: Applies a Discord timeout based on severity (`minor`: 10m, `moderate`: 45m, `major`: 48h) according to staff rank permissions. Only sends confirmation after timeout is successfully applied.
 
 ### Staff Management Commands (Owner Only)

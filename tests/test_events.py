@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock
 import discord
 
 from bot.database import Database
-from events.message_tracking import MessageTracking
 from events.member_events import MemberEvents
 
 
@@ -19,7 +18,6 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         self.bot = MagicMock()
         self.bot.db = self.db
 
-        self.msg_cog = MessageTracking(self.bot)
         self.member_cog = MemberEvents(self.bot)
 
         self.guild_id = 2000
@@ -29,42 +27,6 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         self.temp_dir.cleanup()
-
-    async def test_message_tracking(self):
-        # 1. Normal user message -> tracked
-        msg = MagicMock(spec=discord.Message)
-        msg.author = MagicMock()
-        msg.author.bot = False
-        msg.author.id = 123
-        msg.guild = MagicMock()
-        msg.guild.id = self.guild_id
-        msg.channel = MagicMock()
-        msg.channel.id = 456
-
-        await self.msg_cog.on_message(msg)
-        self.assertEqual(self.db.get_latest_message_channel(self.guild_id, 123), 456)
-
-        # 2. Bot message -> ignored
-        bot_msg = MagicMock(spec=discord.Message)
-        bot_msg.author = MagicMock()
-        bot_msg.author.bot = True
-        bot_msg.author.id = 999
-        bot_msg.guild = MagicMock()
-        bot_msg.guild.id = self.guild_id
-        bot_msg.channel = MagicMock()
-        bot_msg.channel.id = 456
-
-        await self.msg_cog.on_message(bot_msg)
-        self.assertIsNone(self.db.get_latest_message_channel(self.guild_id, 999))
-
-        # 3. DM message -> ignored
-        dm_msg = MagicMock(spec=discord.Message)
-        dm_msg.author = MagicMock()
-        dm_msg.author.bot = False
-        dm_msg.author.id = 123
-        dm_msg.guild = None
-
-        await self.msg_cog.on_message(dm_msg)
 
     async def test_member_join_and_leave_events(self):
         guild = MagicMock(spec=discord.Guild)

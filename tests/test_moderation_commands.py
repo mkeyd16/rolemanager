@@ -97,18 +97,17 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         target = self._create_member(2, [], "TargetUser")
         self.interaction.user = actor
 
-        # Track last active channel for target
-        target_channel = AsyncMock(spec=discord.TextChannel)
-        target_channel.id = 888
-        target_channel.mention = "<#888>"
-        self.db.update_latest_message_channel(self.guild_id, target.id, 888)
-        self.guild.get_channel = lambda cid: target_channel if cid == 888 else self.log_channel
+        cmd_channel = AsyncMock(spec=discord.TextChannel)
+        cmd_channel.id = 888
+        cmd_channel.mention = "<#888>"
+        self.interaction.channel = cmd_channel
 
         await self.cog.warn.callback(self.cog, self.interaction, target, "Inappropriate language")
 
-        # Warning embed sent in target's channel
-        target_channel.send.assert_called_once()
-        kwargs = target_channel.send.call_args[1]
+        # Public warning response sent via interaction.response.send_message
+        self.interaction.response.send_message.assert_called_once()
+        kwargs = self.interaction.response.send_message.call_args[1]
+        self.assertEqual(kwargs.get("ephemeral"), False)
         self.assertIn("embed", kwargs)
         warn_embed = kwargs["embed"]
         self.assertEqual(warn_embed.title, "User Warning/Punishment")
@@ -118,35 +117,18 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("**Reason:** Inappropriate language", warn_embed.description)
         self.assertIn("Please be aware that further violations may result in additional moderation action.", warn_embed.description)
 
-        # Followup response
-        self.interaction.followup.send.assert_called_once()
-        self.assertIn("Warning issued", self.interaction.followup.send.call_args[0][0])
         # Logged in log_channel
         self.log_channel.send.assert_called_once()
-
-    async def test_warn_no_recorded_message_channel(self):
-        actor = self._create_member(1, [self.trainee_role_id, self.staff_role_id], "TraineeUser")
-        target = self._create_member(2, [], "TargetUser")
-        self.interaction.user = actor
-
-        # No message channel in DB for target
-        await self.cog.warn.callback(self.cog, self.interaction, target, "Spamming")
-
-        self.interaction.followup.send.assert_called_once()
-        msg = self.interaction.followup.send.call_args[0][0]
-        self.assertIn("Could not determine <@2>'s last active message channel", msg)
 
     async def test_warn_hierarchy_prevention(self):
         trainee_actor = self._create_member(1, [self.trainee_role_id, self.staff_role_id], "TraineeUser")
         mod_target = self._create_member(2, [self.mod_role_id, self.staff_role_id], "ModUser")
         self.interaction.user = trainee_actor
 
-        self.db.update_latest_message_channel(self.guild_id, mod_target.id, 888)
-
         await self.cog.warn.callback(self.cog, self.interaction, mod_target, "Reason")
 
-        self.interaction.followup.send.assert_called_once()
-        msg = self.interaction.followup.send.call_args[0][0]
+        self.interaction.response.send_message.assert_called_once()
+        msg = self.interaction.response.send_message.call_args[0][0]
         self.assertIn("equal or higher staff rank", msg)
 
     async def test_punish_severity_restrictions_and_durations(self):
@@ -155,18 +137,19 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         senior = self._create_member(3, [self.senior_role_id, self.staff_role_id], "SeniorUser")
         target = self._create_member(4, [], "TargetUser")
 
-        # 1. Trainee attempting moderate -> rejected
+        # 1. Trainee attempting moderate -> rejected (ephemeral error)
         self.interaction.user = trainee
-        self.interaction.followup.send.reset_mock()
+        self.interaction.response.send_message.reset_mock()
         await self.cog.punish.callback(self.cog, self.interaction, target, "moderate", "Offense")
         target.timeout.assert_not_called()
-        self.assertIn("do not have sufficient staff rank", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("do not have sufficient staff rank", self.interaction.response.send_message.call_args[0][0])
+        self.assertEqual(self.interaction.response.send_message.call_args[1].get("ephemeral"), True)
 
-        # 2. Trainee issuing minor -> 10m timeout applied
-        self.interaction.followup.send.reset_mock()
+        # 2. Trainee issuing minor -> 10m timeout applied (public)
+        self.interaction.response.send_message.reset_mock()
         await self.cog.punish.callback(self.cog, self.interaction, target, "minor", "Minor Offense")
         target.timeout.assert_called_once_with(datetime.timedelta(seconds=600), reason="[MINOR] Minor Offense")
-        kwargs = self.interaction.followup.send.call_args[1]
+        kwargs = self.interaction.response.send_message.call_args[1]
         self.assertEqual(kwargs.get("ephemeral"), False)
         punish_embed = kwargs["embed"]
         self.assertEqual(punish_embed.title, "User Warning/Punishment")
@@ -176,29 +159,32 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("**Reason:** Minor Offense", punish_embed.description)
         self.assertIn("<@4> has been timed out for 10 minutes.", punish_embed.description)
 
-        # 3. Moderator attempting major -> rejected
+        # 3. Moderator attempting major -> rejected (ephemeral error)
         self.interaction.user = mod
         target.timeout.reset_mock()
-        self.interaction.followup.send.reset_mock()
+        self.interaction.response.send_message.reset_mock()
         await self.cog.punish.callback(self.cog, self.interaction, target, "major", "Major Offense")
         target.timeout.assert_not_called()
-        self.assertIn("do not have sufficient staff rank", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("do not have sufficient staff rank", self.interaction.response.send_message.call_args[0][0])
+        self.assertEqual(self.interaction.response.send_message.call_args[1].get("ephemeral"), True)
 
-        # 4. Moderator issuing moderate -> 45m timeout applied
-        self.interaction.followup.send.reset_mock()
+        # 4. Moderator issuing moderate -> 45m timeout applied (public)
+        self.interaction.response.send_message.reset_mock()
         await self.cog.punish.callback(self.cog, self.interaction, target, "moderate", "Moderate Offense")
         target.timeout.assert_called_once_with(datetime.timedelta(seconds=2700), reason="[MODERATE] Moderate Offense")
-        kwargs = self.interaction.followup.send.call_args[1]
+        kwargs = self.interaction.response.send_message.call_args[1]
+        self.assertEqual(kwargs.get("ephemeral"), False)
         punish_embed = kwargs["embed"]
         self.assertIn("<@4> has been timed out for 45 minutes.", punish_embed.description)
 
-        # 5. Senior Mod issuing major -> 48h timeout applied
+        # 5. Senior Mod issuing major -> 48h timeout applied (public)
         self.interaction.user = senior
         target.timeout.reset_mock()
-        self.interaction.followup.send.reset_mock()
+        self.interaction.response.send_message.reset_mock()
         await self.cog.punish.callback(self.cog, self.interaction, target, "major", "Major Offense")
         target.timeout.assert_called_once_with(datetime.timedelta(seconds=172800), reason="[MAJOR] Major Offense")
-        kwargs = self.interaction.followup.send.call_args[1]
+        kwargs = self.interaction.response.send_message.call_args[1]
+        self.assertEqual(kwargs.get("ephemeral"), False)
         punish_embed = kwargs["embed"]
         self.assertIn("<@4> has been timed out for 48 hours.", punish_embed.description)
 
@@ -227,57 +213,65 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         non_owner = self._create_member(11, [self.mod_role_id, self.staff_role_id], "ModUser")
         candidate = self._create_member(20, [], "CandidateUser")
 
-        # Non-owner hiring candidate -> rejected
+        # Non-owner hiring candidate -> rejected (ephemeral)
         self.interaction.user = non_owner
+        self.interaction.response.send_message.reset_mock()
         await self.cog.hire.callback(self.cog, self.interaction, candidate)
-        self.assertIn("Only the Server Owner can use `/hire`", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("Only the Server Owner can use `/hire`", self.interaction.response.send_message.call_args[0][0])
+        self.assertEqual(self.interaction.response.send_message.call_args[1].get("ephemeral"), True)
 
-        # Owner hiring candidate
+        # Owner hiring candidate -> success (public)
         self.interaction.user = owner
-        self.interaction.followup.send.reset_mock()
+        self.interaction.response.send_message.reset_mock()
         await self.cog.hire.callback(self.cog, self.interaction, candidate)
         candidate.add_roles.assert_called_once_with(self.staff_role, self.trainee_role, reason="Hired by OwnerUser")
-        self.assertIn("has been hired as a Trainee", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("has been hired as a Trainee", self.interaction.response.send_message.call_args[0][0])
+        self.assertEqual(self.interaction.response.send_message.call_args[1].get("ephemeral"), False)
 
-        # Hiring user who is already staff -> clear message
+        # Hiring user who is already staff -> clear message (ephemeral)
         candidate.roles = [self.staff_role, self.trainee_role]
-        self.interaction.followup.send.reset_mock()
+        self.interaction.response.send_message.reset_mock()
         await self.cog.hire.callback(self.cog, self.interaction, candidate)
-        self.assertIn("is already a staff member", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("is already a staff member", self.interaction.response.send_message.call_args[0][0])
+        self.assertEqual(self.interaction.response.send_message.call_args[1].get("ephemeral"), True)
 
-        # Owner promoting Trainee -> Moderator
+        # Owner promoting Trainee -> Moderator (public)
         candidate.remove_roles.reset_mock()
         candidate.add_roles.reset_mock()
-        self.interaction.followup.send.reset_mock()
+        self.interaction.response.send_message.reset_mock()
         await self.cog.promote.callback(self.cog, self.interaction, candidate)
         candidate.remove_roles.assert_called_once_with(self.trainee_role, reason="Promoted to Moderator by OwnerUser")
         candidate.add_roles.assert_called_with(self.mod_role, reason="Promoted to Moderator by OwnerUser")
-        self.assertIn("promoted from Trainee to Moderator", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("promoted from Trainee to Moderator", self.interaction.response.send_message.call_args[0][0])
+        self.assertEqual(self.interaction.response.send_message.call_args[1].get("ephemeral"), False)
 
-        # Owner promoting Moderator -> Senior Mod
+        # Owner promoting Moderator -> Senior Mod (public)
         candidate.roles = [self.staff_role, self.mod_role]
         candidate.remove_roles.reset_mock()
         candidate.add_roles.reset_mock()
-        self.interaction.followup.send.reset_mock()
+        self.interaction.response.send_message.reset_mock()
         await self.cog.promote.callback(self.cog, self.interaction, candidate)
         candidate.remove_roles.assert_called_once_with(self.mod_role, reason="Promoted to Senior Mod by OwnerUser")
         candidate.add_roles.assert_called_with(self.senior_role, reason="Promoted to Senior Mod by OwnerUser")
-        self.assertIn("promoted from Moderator to Senior Mod", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("promoted from Moderator to Senior Mod", self.interaction.response.send_message.call_args[0][0])
+        self.assertEqual(self.interaction.response.send_message.call_args[1].get("ephemeral"), False)
 
-        # Owner promoting Senior Mod -> no higher rank
+        # Owner promoting Senior Mod -> no higher rank (ephemeral)
         candidate.roles = [self.staff_role, self.senior_role]
-        self.interaction.followup.send.reset_mock()
+        self.interaction.response.send_message.reset_mock()
         await self.cog.promote.callback(self.cog, self.interaction, candidate)
-        self.assertIn("is already a Senior Mod", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("is already a Senior Mod", self.interaction.response.send_message.call_args[0][0])
+        self.assertEqual(self.interaction.response.send_message.call_args[1].get("ephemeral"), True)
 
-        # Owner firing staff member -> removes staff roles, no kick/ban
+        # Owner firing staff member -> removes staff roles (public)
         candidate.roles = [self.staff_role, self.senior_role]
         candidate.remove_roles.reset_mock()
         candidate.add_roles.reset_mock()
-        self.interaction.followup.send.reset_mock()
+        self.interaction.response.send_message.reset_mock()
         await self.cog.fire.callback(self.cog, self.interaction, candidate)
         candidate.remove_roles.assert_called_once_with(self.staff_role, self.senior_role, reason="Fired by OwnerUser")
-        self.assertIn("removed from the staff team", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("removed from the staff team", self.interaction.response.send_message.call_args[0][0])
+        self.assertEqual(self.interaction.response.send_message.call_args[1].get("ephemeral"), False)
 
     async def test_graceful_handling_missing_configured_roles_or_channels(self):
         owner = self._create_member(10, [self.owner_role_id, self.staff_role_id], "OwnerUser")
@@ -295,7 +289,7 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         )
 
         await self.cog.hire.callback(self.cog, self.interaction, candidate)
-        self.assertIn("no longer exists in the server", self.interaction.followup.send.call_args[0][0])
+        self.assertIn("no longer exists in the server", self.interaction.response.send_message.call_args[0][0])
 
 
 if __name__ == "__main__":

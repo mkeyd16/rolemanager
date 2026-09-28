@@ -41,7 +41,6 @@ class Database:
                 CREATE TABLE IF NOT EXISTS user_tracking (
                     guild_id INTEGER,
                     user_id INTEGER,
-                    latest_message_channel_id INTEGER,
                     join_timestamp REAL,
                     PRIMARY KEY (guild_id, user_id)
                 )
@@ -120,31 +119,6 @@ class Database:
             )
             conn.commit()
 
-    def update_latest_message_channel(self, guild_id: int, user_id: int, channel_id: int) -> None:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO user_tracking (guild_id, user_id, latest_message_channel_id)
-                VALUES (?, ?, ?)
-                ON CONFLICT(guild_id, user_id) DO UPDATE SET
-                    latest_message_channel_id = excluded.latest_message_channel_id
-                """,
-                (guild_id, user_id, channel_id),
-            )
-            conn.commit()
-
-    def get_latest_message_channel(self, guild_id: int, user_id: int) -> Optional[int]:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT latest_message_channel_id FROM user_tracking WHERE guild_id = ? AND user_id = ?",
-                (guild_id, user_id),
-            )
-            row = cursor.fetchone()
-            if row and row["latest_message_channel_id"] is not None:
-                return int(row["latest_message_channel_id"])
-            return None
 
     def record_user_join(self, guild_id: int, user_id: int, join_timestamp: float) -> None:
         with self.get_connection() as conn:
