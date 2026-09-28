@@ -106,8 +106,18 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
 
         await self.cog.warn.callback(self.cog, self.interaction, target, "Inappropriate language")
 
-        # Warning message sent in target's channel
-        target_channel.send.assert_called_once_with("<@2> has received a warning: Inappropriate language")
+        # Warning embed sent in target's channel
+        target_channel.send.assert_called_once()
+        kwargs = target_channel.send.call_args[1]
+        self.assertIn("embed", kwargs)
+        warn_embed = kwargs["embed"]
+        self.assertEqual(warn_embed.title, "User Warning/Punishment")
+        self.assertIn("User: <@2>", warn_embed.description)
+        self.assertIn("Moderator: <@1>", warn_embed.description)
+        self.assertIn("Rank: Trainee", warn_embed.description)
+        self.assertIn("Reason: Inappropriate language", warn_embed.description)
+        self.assertIn("Please be aware that further violations may result in additional moderation action.", warn_embed.description)
+
         # Followup response
         self.interaction.followup.send.assert_called_once()
         self.assertIn("Warning issued", self.interaction.followup.send.call_args[0][0])
@@ -156,9 +166,15 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         self.interaction.followup.send.reset_mock()
         await self.cog.punish.callback(self.cog, self.interaction, target, "minor", "Minor Offense")
         target.timeout.assert_called_once_with(datetime.timedelta(seconds=600), reason="[MINOR] Minor Offense")
-        sent_msg = self.interaction.followup.send.call_args[0][0]
-        self.assertIn("10-minute timeout has been applied", sent_msg)
-        self.assertEqual(self.interaction.followup.send.call_args[1].get("ephemeral"), False)
+        kwargs = self.interaction.followup.send.call_args[1]
+        self.assertEqual(kwargs.get("ephemeral"), False)
+        punish_embed = kwargs["embed"]
+        self.assertEqual(punish_embed.title, "User Warning/Punishment")
+        self.assertIn("User: <@4>", punish_embed.description)
+        self.assertIn("Moderator: <@1>", punish_embed.description)
+        self.assertIn("Rank: Trainee", punish_embed.description)
+        self.assertIn("Reason: Minor Offense", punish_embed.description)
+        self.assertIn("<@4> has been timed out for 10 minutes.", punish_embed.description)
 
         # 3. Moderator attempting major -> rejected
         self.interaction.user = mod
@@ -172,8 +188,9 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         self.interaction.followup.send.reset_mock()
         await self.cog.punish.callback(self.cog, self.interaction, target, "moderate", "Moderate Offense")
         target.timeout.assert_called_once_with(datetime.timedelta(seconds=2700), reason="[MODERATE] Moderate Offense")
-        sent_msg = self.interaction.followup.send.call_args[0][0]
-        self.assertIn("45-minute timeout has been applied", sent_msg)
+        kwargs = self.interaction.followup.send.call_args[1]
+        punish_embed = kwargs["embed"]
+        self.assertIn("<@4> has been timed out for 45 minutes.", punish_embed.description)
 
         # 5. Senior Mod issuing major -> 48h timeout applied
         self.interaction.user = senior
@@ -181,8 +198,9 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         self.interaction.followup.send.reset_mock()
         await self.cog.punish.callback(self.cog, self.interaction, target, "major", "Major Offense")
         target.timeout.assert_called_once_with(datetime.timedelta(seconds=172800), reason="[MAJOR] Major Offense")
-        sent_msg = self.interaction.followup.send.call_args[0][0]
-        self.assertIn("48-hour timeout", sent_msg)
+        kwargs = self.interaction.followup.send.call_args[1]
+        punish_embed = kwargs["embed"]
+        self.assertIn("<@4> has been timed out for 48 hours.", punish_embed.description)
 
     async def test_owner_role_punish_all_severities_without_senior_mod(self):
         owner_alone = self._create_member(10, [self.owner_role_id], "OwnerAlone")

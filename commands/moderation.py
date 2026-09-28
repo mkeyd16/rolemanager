@@ -74,9 +74,24 @@ class Moderation(commands.Cog):
             )
             return
 
-        warn_text = f"{user.mention} has received a warning: {reason}"
+        actor_rank_name = RANK_NAMES.get(actor_rank, "Moderator")
+
+        warn_embed_description = (
+            f"User: {user.mention}\n"
+            f"Moderator: {actor.mention}\n"
+            f"Rank: {actor_rank_name}\n"
+            f"Reason: {reason}\n\n"
+            f"Please be aware that further violations may result in additional moderation action."
+        )
+
+        public_warn_embed = discord.Embed(
+            title="User Warning/Punishment",
+            description=warn_embed_description,
+            color=discord.Color.gold(),
+        )
+
         try:
-            await channel.send(warn_text)
+            await channel.send(embed=public_warn_embed)
         except discord.Forbidden:
             await interaction.followup.send(f"Bot lacks permission to send messages in {channel.mention}.", ephemeral=True)
             return
@@ -85,18 +100,18 @@ class Moderation(commands.Cog):
             return
 
         now = datetime.datetime.now(datetime.timezone.utc)
-        embed = discord.Embed(
+        log_embed = discord.Embed(
             title="Moderation Action: WARN",
             color=discord.Color.gold(),
             timestamp=now,
         )
-        embed.add_field(name="Target", value=f"{user.mention} (`{user.id}`)", inline=True)
-        embed.add_field(name="Moderator", value=f"{actor.mention} (`{actor.id}`)", inline=True)
-        embed.add_field(name="Moderator Rank", value=RANK_NAMES.get(actor_rank, "Unknown"), inline=True)
-        embed.add_field(name="Channel", value=channel.mention, inline=True)
-        embed.add_field(name="Reason", value=reason, inline=False)
+        log_embed.add_field(name="Target", value=f"{user.mention} (`{user.id}`)", inline=True)
+        log_embed.add_field(name="Moderator", value=f"{actor.mention} (`{actor.id}`)", inline=True)
+        log_embed.add_field(name="Moderator Rank", value=actor_rank_name, inline=True)
+        log_embed.add_field(name="Channel", value=channel.mention, inline=True)
+        log_embed.add_field(name="Reason", value=reason, inline=False)
 
-        await send_mod_log(guild, db, embed=embed)
+        await send_mod_log(guild, db, embed=log_embed)
         await interaction.followup.send(f"Warning issued to {user.mention} in {channel.mention}.", ephemeral=True)
 
     @app_commands.command(name="punish", description="Issue a timeout punishment to a user")
@@ -163,27 +178,41 @@ class Moderation(commands.Cog):
         rank_name = RANK_NAMES.get(actor_rank, "Moderator")
 
         if severity == "minor":
-            response_msg = f"{user.mention} has been punished by {actor.mention}, {rank_name}, for a minor offense. A 10-minute timeout has been applied. Reason: {reason}"
+            duration_notice = f"{user.mention} has been timed out for 10 minutes."
         elif severity == "moderate":
-            response_msg = f"{user.mention} has been punished by {actor.mention}, {rank_name}, for a moderate offense. A 45-minute timeout has been applied. Reason: {reason}"
+            duration_notice = f"{user.mention} has been timed out for 45 minutes."
         else:  # major
-            response_msg = f"{user.mention} has been issued a 48-hour timeout by {actor.mention}, {rank_name}, for a major offense. For further information regarding this action, please contact the server owner. Reason: {reason}"
+            duration_notice = f"{user.mention} has been timed out for 48 hours."
+
+        punish_embed_description = (
+            f"User: {user.mention}\n"
+            f"Moderator: {actor.mention}\n"
+            f"Rank: {rank_name}\n"
+            f"Reason: {reason}\n\n"
+            f"{duration_notice}"
+        )
+
+        public_punish_embed = discord.Embed(
+            title="User Warning/Punishment",
+            description=punish_embed_description,
+            color=discord.Color.red(),
+        )
 
         now = datetime.datetime.now(datetime.timezone.utc)
-        embed = discord.Embed(
+        log_embed = discord.Embed(
             title=f"Moderation Action: PUNISH ({severity.upper()})",
             color=discord.Color.red(),
             timestamp=now,
         )
-        embed.add_field(name="Target", value=f"{user.mention} (`{user.id}`)", inline=True)
-        embed.add_field(name="Moderator", value=f"{actor.mention} (`{actor.id}`)", inline=True)
-        embed.add_field(name="Moderator Rank", value=rank_name, inline=True)
-        embed.add_field(name="Severity", value=severity.capitalize(), inline=True)
-        embed.add_field(name="Duration", value=f"{seconds // 60} minutes" if seconds < 86400 else f"{seconds // 3600} hours", inline=True)
-        embed.add_field(name="Reason", value=reason, inline=False)
+        log_embed.add_field(name="Target", value=f"{user.mention} (`{user.id}`)", inline=True)
+        log_embed.add_field(name="Moderator", value=f"{actor.mention} (`{actor.id}`)", inline=True)
+        log_embed.add_field(name="Moderator Rank", value=rank_name, inline=True)
+        log_embed.add_field(name="Severity", value=severity.capitalize(), inline=True)
+        log_embed.add_field(name="Duration", value=f"{seconds // 60} minutes" if seconds < 86400 else f"{seconds // 3600} hours", inline=True)
+        log_embed.add_field(name="Reason", value=reason, inline=False)
 
-        await send_mod_log(guild, db, embed=embed)
-        await interaction.followup.send(response_msg, ephemeral=False)
+        await send_mod_log(guild, db, embed=log_embed)
+        await interaction.followup.send(embed=public_punish_embed, ephemeral=False)
 
     @app_commands.command(name="hire", description="Hire a user as a Trainee (Owner only)")
     @app_commands.describe(user="The user to hire")
