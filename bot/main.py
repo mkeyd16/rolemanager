@@ -41,15 +41,28 @@ class MultipurposeBot(commands.Bot):
         # Register tree error handler
         self.tree.on_error = self.on_app_command_error
 
-        # Sync app commands
-        try:
-            synced = await self.tree.sync()
-            logger.info(f"Synced {len(synced)} application slash command(s).")
-        except Exception as e:
-            logger.error(f"Failed to sync slash commands: {e}")
-
     async def on_ready(self):
         logger.info(f"Logged in successfully as {self.user} (ID: {self.user.id})")
+        connected_guilds = list(self.guilds)
+        logger.info(f"Bot is ready. Connected to {len(connected_guilds)} guild(s).")
+
+        global_cmds = self.tree.get_commands()
+        cmd_names = [cmd.name for cmd in global_cmds]
+        logger.info(f"Synchronizing {len(global_cmds)} slash command(s): {', '.join(cmd_names)}")
+
+        try:
+            synced_global = await self.tree.sync()
+            logger.info(f"Successfully synchronized {len(synced_global)} global slash command(s).")
+        except Exception as e:
+            logger.error(f"Failed to synchronize global slash commands: {e}")
+
+        for guild in connected_guilds:
+            try:
+                self.tree.copy_global_to(guild=guild)
+                synced_guild = await self.tree.sync(guild=guild)
+                logger.info(f"Successfully synchronized {len(synced_guild)} command(s) for guild '{guild.name}' (ID: {guild.id}).")
+            except Exception as e:
+                logger.error(f"Failed to synchronize commands for guild '{guild.name}' (ID: {guild.id}): {e}")
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         logger.error(f"Application command error in {interaction.command}: {error}", exc_info=error)

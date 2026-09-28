@@ -99,6 +99,21 @@ class TestHierarchyAndChecks(unittest.TestCase):
         allowed, _ = can_moderate(owner, owner_2, self.config)
         self.assertFalse(allowed)
 
+    def test_owner_role_overrides_without_other_roles(self):
+        # Owner with only owner_role_id (no staff, trainee, mod, senior roles)
+        owner_alone = self._create_mock_member([100], mention="@OwnerAlone")
+        senior = self._create_mock_member([104, 101], mention="@Senior")
+
+        # Rank should be RANK_OWNER
+        self.assertEqual(get_member_staff_rank(owner_alone, self.config), RANK_OWNER)
+
+        # is_staff should be True
+        self.assertTrue(is_staff(owner_alone, self.config))
+
+        # can_moderate against senior mod should be allowed
+        allowed, _ = can_moderate(owner_alone, senior, self.config)
+        self.assertTrue(allowed)
+
 
 if __name__ == "__main__":
     unittest.main()

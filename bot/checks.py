@@ -42,6 +42,9 @@ def is_staff(member: Any, config: Optional[Dict[str, Any]]) -> bool:
     if not member or not config:
         return False
     user_role_ids = get_member_role_ids(member)
+    owner_role_id = config.get("owner_role_id")
+    if owner_role_id and owner_role_id in user_role_ids:
+        return True
     staff_role_id = config.get("staff_role_id")
     if staff_role_id and staff_role_id in user_role_ids:
         return True
@@ -63,6 +66,15 @@ def can_moderate(
         return False, "You do not have a moderation rank."
 
     target_rank = get_member_staff_rank(target, config)
+
+    # Owner can moderate anyone except another Owner
+    if actor_rank == RANK_OWNER:
+        if target_rank == RANK_OWNER:
+            return False, (
+                f"You cannot perform moderation actions against {target.mention} "
+                f"because they have an equal or higher staff rank ({RANK_NAMES[target_rank]})."
+            )
+        return True, ""
 
     # Lower-ranked moderators cannot act on equal or higher-ranked staff
     if target_rank > RANK_NONE and actor_rank <= target_rank:

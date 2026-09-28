@@ -184,6 +184,26 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         sent_msg = self.interaction.followup.send.call_args[0][0]
         self.assertIn("48-hour timeout", sent_msg)
 
+    async def test_owner_role_punish_all_severities_without_senior_mod(self):
+        owner_alone = self._create_member(10, [self.owner_role_id], "OwnerAlone")
+        target = self._create_member(4, [], "TargetUser")
+        self.interaction.user = owner_alone
+
+        # Minor
+        target.timeout.reset_mock()
+        await self.cog.punish.callback(self.cog, self.interaction, target, "minor", "Minor")
+        target.timeout.assert_called_once_with(datetime.timedelta(seconds=600), reason="[MINOR] Minor")
+
+        # Moderate
+        target.timeout.reset_mock()
+        await self.cog.punish.callback(self.cog, self.interaction, target, "moderate", "Moderate")
+        target.timeout.assert_called_once_with(datetime.timedelta(seconds=2700), reason="[MODERATE] Moderate")
+
+        # Major
+        target.timeout.reset_mock()
+        await self.cog.punish.callback(self.cog, self.interaction, target, "major", "Major")
+        target.timeout.assert_called_once_with(datetime.timedelta(seconds=172800), reason="[MAJOR] Major")
+
     async def test_hire_promote_fire_commands(self):
         owner = self._create_member(10, [self.owner_role_id, self.staff_role_id], "OwnerUser")
         non_owner = self._create_member(11, [self.mod_role_id, self.staff_role_id], "ModUser")
