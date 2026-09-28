@@ -112,10 +112,10 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("embed", kwargs)
         warn_embed = kwargs["embed"]
         self.assertEqual(warn_embed.title, "User Warning/Punishment")
-        self.assertIn("User: <@2>", warn_embed.description)
-        self.assertIn("Moderator: <@1>", warn_embed.description)
-        self.assertIn("Rank: Trainee", warn_embed.description)
-        self.assertIn("Reason: Inappropriate language", warn_embed.description)
+        self.assertIn("**User:** <@2>", warn_embed.description)
+        self.assertIn("**Moderator:** <@1>", warn_embed.description)
+        self.assertIn("**Rank:** Trainee", warn_embed.description)
+        self.assertIn("**Reason:** Inappropriate language", warn_embed.description)
         self.assertIn("Please be aware that further violations may result in additional moderation action.", warn_embed.description)
 
         # Followup response
@@ -170,10 +170,10 @@ class TestModerationCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kwargs.get("ephemeral"), False)
         punish_embed = kwargs["embed"]
         self.assertEqual(punish_embed.title, "User Warning/Punishment")
-        self.assertIn("User: <@4>", punish_embed.description)
-        self.assertIn("Moderator: <@1>", punish_embed.description)
-        self.assertIn("Rank: Trainee", punish_embed.description)
-        self.assertIn("Reason: Minor Offense", punish_embed.description)
+        self.assertIn("**User:** <@4>", punish_embed.description)
+        self.assertIn("**Moderator:** <@1>", punish_embed.description)
+        self.assertIn("**Rank:** Trainee", punish_embed.description)
+        self.assertIn("**Reason:** Minor Offense", punish_embed.description)
         self.assertIn("<@4> has been timed out for 10 minutes.", punish_embed.description)
 
         # 3. Moderator attempting major -> rejected

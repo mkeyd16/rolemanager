@@ -46,16 +46,24 @@ class MultipurposeBot(commands.Bot):
         connected_guilds = list(self.guilds)
         logger.info(f"Bot is ready. Connected to {len(connected_guilds)} guild(s).")
 
-        global_cmds = self.tree.get_commands()
+        # Save local command definitions before clearing global commands
+        global_cmds = list(self.tree.get_commands(guild=None))
         cmd_names = [cmd.name for cmd in global_cmds]
-        logger.info(f"Synchronizing {len(global_cmds)} slash command(s): {', '.join(cmd_names)}")
+        logger.info(f"Commands loaded in tree ({len(global_cmds)}): {', '.join(cmd_names)}")
 
+        # Clear stale global commands from Discord API to prevent duplicate global/guild commands
         try:
-            synced_global = await self.tree.sync()
-            logger.info(f"Successfully synchronized {len(synced_global)} global slash command(s).")
+            self.tree.clear_commands(guild=None)
+            await self.tree.sync()
+            logger.info("Cleared stale global commands from Discord API.")
         except Exception as e:
-            logger.error(f"Failed to synchronize global slash commands: {e}")
+            logger.error(f"Failed to clear global commands: {e}")
 
+        # Restore local commands into tree
+        for cmd in global_cmds:
+            self.tree.add_command(cmd)
+
+        # Synchronize commands to each connected guild
         for guild in connected_guilds:
             try:
                 self.tree.copy_global_to(guild=guild)

@@ -77,10 +77,10 @@ class Moderation(commands.Cog):
         actor_rank_name = RANK_NAMES.get(actor_rank, "Moderator")
 
         warn_embed_description = (
-            f"User: {user.mention}\n"
-            f"Moderator: {actor.mention}\n"
-            f"Rank: {actor_rank_name}\n"
-            f"Reason: {reason}\n\n"
+            f"**User:** {user.mention}\n"
+            f"**Moderator:** {actor.mention}\n"
+            f"**Rank:** {actor_rank_name}\n"
+            f"**Reason:** {reason}\n\n"
             f"Please be aware that further violations may result in additional moderation action."
         )
 
@@ -185,10 +185,10 @@ class Moderation(commands.Cog):
             duration_notice = f"{user.mention} has been timed out for 48 hours."
 
         punish_embed_description = (
-            f"User: {user.mention}\n"
-            f"Moderator: {actor.mention}\n"
-            f"Rank: {rank_name}\n"
-            f"Reason: {reason}\n\n"
+            f"**User:** {user.mention}\n"
+            f"**Moderator:** {actor.mention}\n"
+            f"**Rank:** {rank_name}\n"
+            f"**Reason:** {reason}\n\n"
             f"{duration_notice}"
         )
 

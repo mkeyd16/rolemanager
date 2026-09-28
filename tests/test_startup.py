@@ -28,14 +28,30 @@ class TestStartupSync(unittest.IsolatedAsyncioTestCase):
         bot.tree.get_commands = MagicMock(return_value=[])
         bot.tree.sync = AsyncMock(return_value=[])
         bot.tree.copy_global_to = MagicMock()
+        bot.tree.clear_commands = MagicMock()
 
         await bot.on_ready()
 
-        # Check that tree.sync was called for global and for both guilds
+        # Check that clear_commands(guild=None) was called to remove stale global commands
+        bot.tree.clear_commands.assert_called_with(guild=None)
         self.assertEqual(bot.tree.sync.call_count, 3)
         self.assertEqual(bot.tree.copy_global_to.call_count, 2)
         bot.tree.copy_global_to.assert_any_call(guild=guild1)
         bot.tree.copy_global_to.assert_any_call(guild=guild2)
+
+    async def test_unique_command_names_in_tree(self):
+        bot = MultipurposeBot()
+        await bot.setup_hook()
+
+        cmds = bot.tree.get_commands()
+        cmd_names = [c.name for c in cmds]
+        self.assertEqual(len(cmd_names), len(set(cmd_names)), f"Duplicate commands found: {cmd_names}")
+
+        # Check subcommands of /setup
+        setup_cmd = next((c for c in cmds if c.name == "setup"), None)
+        self.assertIsNotNone(setup_cmd)
+        subcmd_names = [sub.name for sub in setup_cmd.commands]
+        self.assertEqual(len(subcmd_names), len(set(subcmd_names)), f"Duplicate setup subcommands found: {subcmd_names}")
 
     async def test_on_ready_idempotency(self):
         bot = MultipurposeBot()
@@ -51,12 +67,14 @@ class TestStartupSync(unittest.IsolatedAsyncioTestCase):
         bot._connection._guilds = {1001: guild1}
         bot._connection.guilds = [guild1]
 
-        cmd = MagicMock()
+        cmd = MagicMock(spec=discord.app_commands.Command)
         cmd.name = "warn"
         bot._tree = MagicMock()
         bot.tree.get_commands = MagicMock(return_value=[cmd])
         bot.tree.sync = AsyncMock(return_value=[cmd])
         bot.tree.copy_global_to = MagicMock()
+        bot.tree.clear_commands = MagicMock()
+        bot.tree.add_command = MagicMock()
 
         # Run on_ready twice
         await bot.on_ready()
