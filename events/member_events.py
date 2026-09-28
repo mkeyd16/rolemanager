@@ -37,18 +37,23 @@ class MemberEvents(commands.Cog):
                 return
 
         created_at = member.created_at
-        account_age = format_days_between(created_at, now) if created_at else "Unknown"
+        account_age = f"{format_days_between(created_at, now)} days" if created_at else "Unknown"
         join_date_str = format_date(member.joined_at or now)
 
-        msg = (
-            f"**User has joined the server.**\n"
-            f"@{member.name} ({member.display_name})\n"
-            f"Account age: {account_age} days\n"
+        description = (
+            f"{member.mention} ({member.display_name})\n"
+            f"Account age: {account_age}\n"
             f"Join date: {join_date_str}"
         )
 
+        embed = discord.Embed(
+            title="User has joined the server.",
+            description=description,
+            color=discord.Color.green(),
+        )
+
         try:
-            await channel.send(msg)
+            await channel.send(embed=embed)
         except Exception as e:
             logger.warning(f"Failed to send join message in guild {guild.id}: {e}")
 
@@ -89,16 +94,21 @@ class MemberEvents(commands.Cog):
             except Exception:
                 return
 
-        msg = (
-            f"**User has left the server.**\n"
-            f"@{member.name} ({member.display_name})\n"
+        description = (
+            f"{member.mention} ({member.display_name})\n"
             f"Join date: {join_date_str}\n"
             f"Leave date: {leave_date_str}\n"
             f"Time in server: {time_in_server}"
         )
 
+        embed = discord.Embed(
+            title="User has left the server.",
+            description=description,
+            color=discord.Color.red(),
+        )
+
         try:
-            await channel.send(msg)
+            await channel.send(embed=embed)
         except Exception as e:
             logger.warning(f"Failed to send leave message in guild {guild.id}: {e}")
 
